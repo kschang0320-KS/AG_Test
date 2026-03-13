@@ -5,6 +5,7 @@ const STORAGE_KEY = 'open_voice_posts';
 const CATEGORIES_KEY = 'open_voice_categories';
 const UPVOTED_KEY = 'open_voice_upvoted'; // 공감 중복 방지 (평문 저장, 민감정보 없음)
 const CLIENT_ID_KEY = 'open_voice_client_id'; // 기기별 공통되는 난수 ID
+const SETTINGS_KEY = 'open_voice_admin_settings'; // 관리자 환경설정 암호화 보관
 
 const DEFAULT_CATEGORIES = ['조직문화', '복지', '업무환경', '기타'];
 
@@ -328,4 +329,39 @@ export function getCategoryMeta(name) {
     if (keywords.some(k => lower.includes(k))) return { desc };
   }
   return { desc: `${name} 관련 의견 및 건의사항` };
+}
+
+// ─── 관리자 환경설정 (Admin Settings) ──────────────────────────────────
+/**
+ * 관리자 환경설정 로드
+ * @returns {object} { adminPwdHash, adminEmail, adminBackupEmail, slackWebhook }
+ */
+export function getAdminSettings() {
+  try {
+    const stored = localStorage.getItem(SETTINGS_KEY);
+    if (stored) {
+      const decrypted = decrypt(stored);
+      if (decrypted) return decrypted;
+    }
+  } catch { /* ignore */ }
+  
+  // Storage에 없거나 복호화 실패 시 기본 fallback (.env 활용) 반환
+  return {
+    adminPwdHash: import.meta.env.VITE_ADMIN_PWD_HASH || '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
+    adminEmail: '',
+    adminBackupEmail: '',
+    slackWebhook: import.meta.env.VITE_SLACK_WEBHOOK_URL || ''
+  };
+}
+
+/**
+ * 관리자 환경설정 암호화 저장
+ * @param {object} settings 
+ */
+export function saveAdminSettings(settings) {
+  const current = getAdminSettings();
+  const updated = { ...current, ...settings };
+  
+  const cipher = encrypt(updated);
+  if (cipher) localStorage.setItem(SETTINGS_KEY, cipher);
 }

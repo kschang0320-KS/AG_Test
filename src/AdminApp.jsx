@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, MessageSquare } from 'lucide-react';
+import { Shield, MessageSquare, Lock, Download } from 'lucide-react';
 import AdminPage from './pages/AdminPage';
 import { loadPosts, loadCategories } from './store';
 import './index.css';
@@ -7,6 +7,9 @@ import './index.css';
 export default function AdminApp() {
   const [posts, setPosts] = useState(() => loadPosts());
   const [categories, setCategories] = useState(() => loadCategories());
+  
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -23,9 +26,26 @@ export default function AdminApp() {
                 <p className="text-sm font-bold text-gray-900 -mt-0.5">신문고</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 ml-3 bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-1.5">
-              <Shield size={12} className="text-orange-600" />
-              <span className="text-xs font-bold text-orange-700">관리자 모드</span>
+            
+            <div className="flex flex-1 justify-end items-center">
+              <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-1.5">
+                <Shield size={12} className="text-orange-600" />
+                <span className="text-xs font-bold text-orange-700">관리자 모드</span>
+              </div>
+              <div className="flex items-center gap-1.5 ml-2 border-l border-gray-200 pl-2">
+                <button onClick={() => setShowSettingsModal(true)}
+                  className="flex items-center justify-center p-1.5 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-gray-800 rounded-lg transition-colors"
+                  title="환경 설정"
+                >
+                  <Lock size={15} />
+                </button>
+                <button onClick={() => setShowExportModal(true)}
+                  className="flex items-center justify-center p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-colors"
+                  title="CSV 다운로드"
+                >
+                  <Download size={15} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -48,6 +68,10 @@ export default function AdminApp() {
             setPosts={setPosts}
             categories={categories}
             setCategories={setCategories}
+            showExportModal={showExportModal}
+            setShowExportModal={setShowExportModal}
+            showSettingsModal={showSettingsModal}
+            setShowSettingsModal={setShowSettingsModal}
             onBack={() => window.location.href = '/'}
           />
         </div>

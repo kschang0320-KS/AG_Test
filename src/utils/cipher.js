@@ -48,3 +48,14 @@ export function decrypt(ciphertext) {
     return null;
   }
 }
+
+/**
+ * 단방향 해시 생성 (SHA-256)
+ * 관리자 비밀번호 등을 .env의 해시값과 비교할 때 사용합니다.
+ * @param {string} text - 원본 문자열
+ * @returns {string} - HEX로 인코딩된 해시 문자열
+ */
+export function hashSHA256(text) {
+  if (!text) return '';
+  return CryptoJS.SHA256(text).toString(CryptoJS.enc.Hex);
+}

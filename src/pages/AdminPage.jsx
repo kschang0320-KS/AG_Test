@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { Shield, Loader2, Send, ClipboardList, Search, Plus, Trash2, Tag, ChevronDown, ChevronUp, Download, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Shield, Loader2, Send, ClipboardList, Search, Plus, Trash2, Tag, ChevronDown, ChevronUp, Download, X, Lock } from 'lucide-react';
 import ProgressStepper from '../components/ProgressStepper';
 import { STATUS_STEPS, updatePostStatus, getCategoryPalette, getCategoryIcon,
-         addCategory, removeCategory, saveCategories } from '../store';
+         addCategory, removeCategory, saveCategories,
+         getAdminSettings, saveAdminSettings } from '../store';
+import { hashSHA256 } from '../utils/cipher';
 
 const STATUS_META = {
   received:    { label: '접수됨', cls: 'bg-slate-100 text-slate-600' },
@@ -138,8 +140,11 @@ function CategoryManager({ categories, setCategories }) {
                   className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-colors
                     ${isConfirming ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: palette.accent }} />
-                    <span className="text-xs font-medium text-gray-700">{icon} {cat}</span>
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: palette.accent }} />
+                    <span className="text-sm font-semibold text-gray-800 flex flex-row items-center gap-1.5 whitespace-nowrap">
+                      <span>{icon}</span>
+                      <span>{cat}</span>
+                    </span>
                   </div>
                   {isConfirming ? (
                     /* 삭제 확인 인라인 UI */
@@ -156,8 +161,8 @@ function CategoryManager({ categories, setCategories }) {
                     </div>
                   ) : (
                     <button onClick={() => setConfirmDelete(cat)}
-                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
-                      <Trash2 size={12} />
+                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </div>
@@ -308,12 +313,168 @@ function ExportModal({ categories, posts, onClose }) {
   );
 }
 
+// ─── 관리자 환경설정 모달 ─────────────────────────────────────────────
+function AdminSettingsModal({ onClose }) {
+  const settings = getAdminSettings();
+  const [pwd, setPwd] = useState(''); // 변경할 비밀번호
+  const [email1, setEmail1] = useState(settings.adminEmail || '');
+  const [email2, setEmail2] = useState(settings.adminBackupEmail || '');
+  const [slack, setSlack] = useState(settings.slackWebhook || '');
+  const [savedMsg, setSavedMsg] = useState('');
+
+  const handleSave = () => {
+    const payload = {
+      adminEmail: email1.trim(),
+      adminBackupEmail: email2.trim(),
+      slackWebhook: slack.trim()
+    };
+    if (pwd.trim()) {
+      payload.adminPwdHash = hashSHA256(pwd.trim());
+    }
+    saveAdminSettings(payload);
+    setSavedMsg('설정이 안전하게 저장되었습니다.');
+    setTimeout(() => setSavedMsg(''), 3000);
+    // 비밀번호까지 변경했다면, 다음 접속 시 바뀐 비밀번호를 요구함 (현재 세션은 유지)
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2">
+            <Lock size={16} className="text-blue-600" /> 관리자 환경설정
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div>
+            <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">비밀번호 변경 (선택)</label>
+            <input type="password" value={pwd} onChange={e => setPwd(e.target.value)}
+              placeholder="새로운 비밀번호 입력 (변경 시에만)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+            <p className="text-[10px] text-gray-400 mt-1">입력 시 기존 암호를 덮어쓰고 새로운 해시로 즉시 교체됩니다.</p>
+          </div>
+          
+          <div className="pt-2 border-t border-gray-100">
+            <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">수신용 메인 메일 (EmailJS 연동용)</label>
+            <input type="email" value={email1} onChange={e => setEmail1(e.target.value)}
+              placeholder="admin@example.com"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">수신용 백업 메일 (EmailJS 연동용)</label>
+            <input type="email" value={email2} onChange={e => setEmail2(e.target.value)}
+              placeholder="backup@example.com"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+            <p className="text-[10px] text-gray-400 mt-1">메인 메일과 함께 동시에 알림이 발송됩니다.</p>
+          </div>
+
+          <div className="pt-2 border-t border-gray-100">
+            <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Slack Webhook URL</label>
+            <input type="url" value={slack} onChange={e => setSlack(e.target.value)}
+              placeholder="https://hooks.slack.com/services/..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          </div>
+
+          {savedMsg && <p className="text-xs text-blue-600 font-bold bg-blue-50 p-2 rounded-lg text-center">{savedMsg}</p>}
+          
+          <button onClick={handleSave}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-colors mt-2">
+            설정 저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── 관리자 로그인 패널 ─────────────────────────────────────────────
+function AdminLogin({ onLogin }) {
+  const [id, setId] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (onLogin(id, password)) {
+      setError('');
+    } else {
+      setError('아이디 또는 비밀번호가 일치하지 않습니다.');
+      setPassword('');
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-[60vh] px-4">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+        <div className="flex justify-center mb-6">
+          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
+            <Lock size={24} />
+          </div>
+        </div>
+        <h2 className="text-xl font-bold text-center text-gray-800 mb-6">관리자 로그인</h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">아이디</label>
+            <input type="text" value={id} onChange={e => setId(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              placeholder="Admin ID" autoFocus />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">비밀번호</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              placeholder="••••••••" />
+          </div>
+          {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
+          <button type="submit"
+            className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors mt-2">
+            접속하기
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── 메인 AdminPage ─────────────────────────────────────────────────
-export default function AdminPage({ posts, setPosts, categories, setCategories }) {
+export default function AdminPage({
+  posts, setPosts,
+  categories, setCategories,
+  showExportModal, setShowExportModal,
+  showSettingsModal, setShowSettingsModal
+}) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem('open_voice_admin_auth') === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = (inputId, inputPwd) => {
+    const settings = getAdminSettings();
+    const envId = import.meta.env.VITE_ADMIN_ID || 'admin';
+    const activeHash = settings.adminPwdHash; // storage 우선 (없으면 fallback env hash 반환됨)
+    
+    if (inputId === envId && hashSHA256(inputPwd) === activeHash) {
+      sessionStorage.setItem('open_voice_admin_auth', 'true');
+      setIsAuthenticated(true);
+      return true;
+    }
+    return false;
+  };
+
+  if (!isAuthenticated) {
+    return <AdminLogin onLogin={handleLogin} />;
+  }
 
   const filtered = posts
     .filter(p => p.content.includes(search) || p.category.includes(search))
@@ -342,18 +503,9 @@ export default function AdminPage({ posts, setPosts, categories, setCategories }
       {showExportModal && (
         <ExportModal categories={categories} posts={posts} onClose={() => setShowExportModal(false)} />
       )}
-
-      {/* 데이터 내보내기 */}
-      <div className="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Download size={15} className="text-emerald-600" />
-          <span className="text-sm font-bold text-gray-700">데이터를 CSV 파일로 추출</span>
-        </div>
-        <button onClick={() => setShowExportModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors">
-          선택 추출
-        </button>
-      </div>
+      {showSettingsModal && (
+        <AdminSettingsModal onClose={() => setShowSettingsModal(false)} />
+      )}
 
       {/* 카테고리 관리 */}
       <CategoryManager categories={categories} setCategories={setCategories} />

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageSquare, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, CheckCircle2, Lock, Download } from 'lucide-react';
 import MainPage from './pages/MainPage';
 import TransparencyPage from './pages/TransparencyPage';
 import AdminPage from './pages/AdminPage';
@@ -7,7 +7,7 @@ import { loadPosts, savePosts, loadCategories, saveCategories, toggleUpvote, add
 import { Shield } from 'lucide-react';
 import './index.css';
 
-const TABS = [
+const BASE_TABS = [
   { key: 'main', label: 'VOC 피드', icon: MessageSquare },
   { key: 'transparency', label: '해결 성과', icon: CheckCircle2 },
 ];
@@ -28,7 +28,18 @@ const QUOTE = QUOTES[Math.floor(Math.random() * QUOTES.length)];
 export default function App() {
   const [posts, setPosts] = useState(() => loadPosts());
   const [categories, setCategories] = useState(() => loadCategories());
-  const [activeTab, setActiveTab] = useState('main');
+  
+  // URL 경로가 /admin 으로 시작하는지 확인하여 관리자 모드 노출 여부 결정
+  const [isAdminRoute] = useState(() => window.location.pathname.startsWith('/admin'));
+  const [activeTab, setActiveTab] = useState(() => isAdminRoute ? 'admin' : 'main');
+
+  const TABS = isAdminRoute 
+    ? [...BASE_TABS, { key: 'admin', label: '관리자 모드', icon: Shield }]
+    : BASE_TABS;
+
+  // 관리자 전용 제어 모달 상태 (AdminPage에 prop로 전달)
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const handleUpvote = (id) => {
     const { updatedPosts } = toggleUpvote(id);
@@ -56,24 +67,44 @@ export default function App() {
               </div>
             </button>
 
-            {/* Tabs */}
-            <nav className="flex">
-              {TABS.map(tab => {
-                const Icon = tab.icon;
-                const active = activeTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors
-                      ${active ? 'text-blue-700 bg-blue-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+            {/* Tabs & Admin Controls */}
+            <div className="flex flex-1 justify-end">
+              <nav className="flex items-center">
+                {TABS.map(tab => {
+                  const Icon = tab.icon;
+                  const active = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors
+                        ${active ? 'text-blue-700 bg-blue-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      <Icon size={13} />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* 관리자 탭 활성화 시 헤더 우측에 메뉴 표시 */}
+              {activeTab === 'admin' && (
+                <div className="flex items-center gap-1.5 ml-2 border-l border-gray-200 pl-2">
+                  <button onClick={() => setShowSettingsModal(true)}
+                    className="flex items-center justify-center p-1.5 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-gray-800 rounded-lg transition-colors"
+                    title="환경 설정"
                   >
-                    <Icon size={13} />
-                    <span className="hidden sm:inline">{tab.label}</span>
+                    <Lock size={15} />
                   </button>
-                );
-              })}
-            </nav>
+                  <button onClick={() => setShowExportModal(true)}
+                    className="flex items-center justify-center p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-colors"
+                    title="CSV 다운로드"
+                  >
+                    <Download size={15} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -102,10 +133,19 @@ export default function App() {
       </div>
 
       <main>
-        {activeTab === 'main' ? (
+        {activeTab === 'main' && (
           <MainPage posts={posts} setPosts={setPosts} categories={categories} setCategories={setCategories} onUpvote={handleUpvote} onComment={handleComment} />
-        ) : (
+        )}
+        {activeTab === 'transparency' && (
           <TransparencyPage posts={posts} categories={categories} />
+        )}
+        {activeTab === 'admin' && (
+          <AdminPage 
+            posts={posts} setPosts={setPosts} 
+            categories={categories} setCategories={setCategories}
+            showExportModal={showExportModal} setShowExportModal={setShowExportModal}
+            showSettingsModal={showSettingsModal} setShowSettingsModal={setShowSettingsModal}
+          />
         )}
       </main>
     </div>
